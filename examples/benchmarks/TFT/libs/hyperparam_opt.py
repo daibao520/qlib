@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2020 The Google Research Authors.
+# Copyright 2021 The Google Research Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -88,11 +88,12 @@ class HyperparamOptManager:
         params_file = os.path.join(self.hyperparam_folder, "params.csv")
 
         if os.path.exists(results_file) and os.path.exists(params_file):
+
             self.results = pd.read_csv(results_file, index_col=0)
             self.saved_params = pd.read_csv(params_file, index_col=0)
 
             if not self.results.empty:
-                self.results.at["loss"] = self.results.loc["loss"].apply(float)
+                self.results["loss"] = self.results.loc["loss"].apply(float)
                 self.best_score = self.results.loc["loss"].min()
 
                 is_optimal = self.results.loc["loss"] == self.best_score
@@ -177,6 +178,7 @@ class HyperparamOptManager:
             return parameters
 
         for _ in range(self._max_tries):
+
             parameters = _get_next()
             name = self._get_name(parameters)
 
@@ -252,9 +254,9 @@ class DistributedHyperparamOptManager(HyperparamOptManager):
           param_ranges: Discrete hyperparameter range for random search.
           fixed_params: Fixed model parameters per experiment.
           root_model_folder: Folder to store optimisation artifacts.
-          worker_number: Worker index defining which set of hyperparameters to
+          worker_number: Worker index definining which set of hyperparameters to
             test.
-          search_iterations: Maximum number of random search iterations.
+          search_iterations: Maximum numer of random search iterations.
           num_iterations_per_worker: How many iterations are handled per worker.
           clear_serialised_params: Whether to regenerate hyperparameter
             combinations.
@@ -328,7 +330,7 @@ class DistributedHyperparamOptManager(HyperparamOptManager):
         if os.path.exists(self.serialised_ranges_folder):
             df = pd.read_csv(self.serialised_ranges_path, index_col=0)
         else:
-            print("Unable to load - regenerating search ranges instead")
+            print("Unable to load - regenerating serach ranges instead")
             df = self.update_serialised_hyperparam_df()
 
         return df

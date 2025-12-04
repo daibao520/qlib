@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2020 The Google Research Authors.
+# Copyright 2021 The Google Research Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -36,12 +36,13 @@ def get_single_col_by_input_type(input_type, column_definition):
     l = [tup[0] for tup in column_definition if tup[2] == input_type]
 
     if len(l) != 1:
-        raise ValueError("Invalid number of columns for {}".format(input_type))
+        raise ValueError('Invalid number of columns for {}'.format(input_type))
 
     return l[0]
 
 
-def extract_cols_from_data_type(data_type, column_definition, excluded_input_types):
+def extract_cols_from_data_type(data_type, column_definition,
+                                excluded_input_types):
     """Extracts the names of columns that correspond to a define data_type.
 
     Args:
@@ -52,7 +53,11 @@ def extract_cols_from_data_type(data_type, column_definition, excluded_input_typ
     Returns:
       List of names for columns with data type specified.
     """
-    return [tup[0] for tup in column_definition if tup[1] == data_type and tup[2] not in excluded_input_types]
+    return [
+        tup[0]
+        for tup in column_definition
+        if tup[1] == data_type and tup[2] not in excluded_input_types
+    ]
 
 
 # Loss functions.
@@ -73,14 +78,15 @@ def tensorflow_quantile_loss(y, y_pred, quantile):
 
     # Checks quantile
     if quantile < 0 or quantile > 1:
-        raise ValueError("Illegal quantile value={}! Values should be between 0 and 1.".format(quantile))
+        raise ValueError(
+            'Illegal quantile value={}! Values should be between 0 and 1.'.format(
+                quantile))
 
     prediction_underflow = y - y_pred
-    q_loss = quantile * tf.maximum(prediction_underflow, 0.0) + (1.0 - quantile) * tf.maximum(
-        -prediction_underflow, 0.0
-    )
+    q_loss = quantile * tf.maximum(prediction_underflow, 0.) + (
+        1. - quantile) * tf.maximum(-prediction_underflow, 0.)
 
-    return tf.reduce_sum(q_loss, axis=-1)
+    return tf.reduce_sum(input_tensor=q_loss, axis=-1)
 
 
 def numpy_normalised_quantile_loss(y, y_pred, quantile):
@@ -98,9 +104,8 @@ def numpy_normalised_quantile_loss(y, y_pred, quantile):
       Float for normalised quantile loss.
     """
     prediction_underflow = y - y_pred
-    weighted_errors = quantile * np.maximum(prediction_underflow, 0.0) + (1.0 - quantile) * np.maximum(
-        -prediction_underflow, 0.0
-    )
+    weighted_errors = quantile * np.maximum(prediction_underflow, 0.) \
+        + (1. - quantile) * np.maximum(-prediction_underflow, 0.)
 
     quantile_loss = weighted_errors.mean()
     normaliser = y.abs().mean()
@@ -120,7 +125,7 @@ def create_folder_if_not_exist(directory):
 
 
 # Tensorflow related functions.
-def get_default_tensorflow_config(tf_device="gpu", gpu_id=0):
+def get_default_tensorflow_config(tf_device='gpu', gpu_id=0):
     """Creates tensorflow config for graphs to run on CPU or GPU.
 
     Specifies whether to run graph on gpu or cpu and which GPU ID to use for multi
@@ -134,17 +139,18 @@ def get_default_tensorflow_config(tf_device="gpu", gpu_id=0):
       Tensorflow config.
     """
 
-    if tf_device == "cpu":
-        os.environ["CUDA_VISIBLE_DEVICES"] = "-1"  # for training on cpu
-        tf_config = tf.ConfigProto(log_device_placement=False, device_count={"GPU": 0})
+    if tf_device == 'cpu':
+        os.environ['CUDA_VISIBLE_DEVICES'] = '-1'  # for training on cpu
+        tf_config = tf.compat.v1.ConfigProto(
+            log_device_placement=False, device_count={'GPU': 0})
 
     else:
-        os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-        os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu_id)
+        os.environ['CUDA_DEVICE_ORDER'] = 'PCI_BUS_ID'
+        os.environ['CUDA_VISIBLE_DEVICES'] = str(gpu_id)
 
-        print("Selecting GPU ID={}".format(gpu_id))
+        print('Selecting GPU ID={}'.format(gpu_id))
 
-        tf_config = tf.ConfigProto(log_device_placement=False)
+        tf_config = tf.compat.v1.ConfigProto(log_device_placement=False)
         tf_config.gpu_options.allow_growth = True
 
     return tf_config
@@ -163,14 +169,14 @@ def save(tf_session, model_folder, cp_name, scope=None):
     """
     # Save model
     if scope is None:
-        saver = tf.train.Saver()
+        saver = tf.compat.v1.train.Saver()
     else:
-        var_list = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=scope)
-        saver = tf.train.Saver(var_list=var_list, max_to_keep=100000)
+        var_list = tf.compat.v1.get_collection(tf.compat.v1.GraphKeys.TRAINABLE_VARIABLES, scope=scope)
+        saver = tf.compat.v1.train.Saver(var_list=var_list, max_to_keep=100000)
 
-    save_path = saver.save(tf_session, os.path.join(model_folder, "{0}.ckpt".format(cp_name)))
-    print("Model saved to: {0}".format(save_path))
-
+    save_path = saver.save(tf_session,
+                           os.path.join(model_folder, '{0}.ckpt'.format(cp_name)))
+    print('Model saved to: {0}'.format(save_path))
 
 def load(tf_session, model_folder, cp_name, scope=None, verbose=False):
     """Loads Tensorflow graph from checkpoint.
@@ -183,30 +189,31 @@ def load(tf_session, model_folder, cp_name, scope=None, verbose=False):
       verbose: Whether to print additional debugging information.
     """
     # Load model proper
-    load_path = os.path.join(model_folder, "{0}.ckpt".format(cp_name))
+    load_path = os.path.join(model_folder, '{0}.ckpt'.format(cp_name))
 
-    print("Loading model from {0}".format(load_path))
+    print('Loading model from {0}'.format(load_path))
 
     print_weights_in_checkpoint(model_folder, cp_name)
 
-    initial_vars = set([v.name for v in tf.get_default_graph().as_graph_def().node])
+    initial_vars = set(
+        [v.name for v in tf.compat.v1.get_default_graph().as_graph_def().node])
 
     # Saver
     if scope is None:
-        saver = tf.train.Saver()
+        saver = tf.compat.v1.train.Saver()
     else:
-        var_list = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=scope)
-        saver = tf.train.Saver(var_list=var_list, max_to_keep=100000)
+        var_list = tf.compat.v1.get_collection(tf.compat.v1.GraphKeys.GLOBAL_VARIABLES, scope=scope)
+        saver = tf.compat.v1.train.Saver(var_list=var_list, max_to_keep=100000)
     # Load
     saver.restore(tf_session, load_path)
-    all_vars = set([v.name for v in tf.get_default_graph().as_graph_def().node])
+    all_vars = set([v.name for v in tf.compat.v1.get_default_graph().as_graph_def().node])
 
     if verbose:
-        print("Restored {0}".format(",".join(initial_vars.difference(all_vars))))
-        print("Existing {0}".format(",".join(all_vars.difference(initial_vars))))
-        print("All {0}".format(",".join(all_vars)))
+        print('Restored {0}'.format(','.join(initial_vars.difference(all_vars))))
+        print('Existing {0}'.format(','.join(all_vars.difference(initial_vars))))
+        print('All {0}'.format(','.join(all_vars)))
 
-    print("Done.")
+    print('Done.')
 
 
 def print_weights_in_checkpoint(model_folder, cp_name):
@@ -219,6 +226,10 @@ def print_weights_in_checkpoint(model_folder, cp_name):
     Returns:
 
     """
-    load_path = os.path.join(model_folder, "{0}.ckpt".format(cp_name))
+    load_path = os.path.join(model_folder, '{0}.ckpt'.format(cp_name))
 
-    print_tensors_in_checkpoint_file(file_name=load_path, tensor_name="", all_tensors=True, all_tensor_names=True)
+    print_tensors_in_checkpoint_file(
+        file_name=load_path,
+        tensor_name='',
+        all_tensors=True,
+        all_tensor_names=True)

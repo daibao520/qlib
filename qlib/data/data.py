@@ -5,6 +5,7 @@
 from __future__ import division
 from __future__ import print_function
 
+import sys
 import re
 import abc
 import copy
@@ -106,7 +107,7 @@ class CalendarProvider(abc.ABC):
         else:
             end_time = _calendar[-1]
         _, _, si, ei = self.locate_index(start_time, end_time, freq, future)
-        return _calendar[si : ei + 1]
+        return _calendar[si: ei + 1]
 
     def locate_index(
         self, start_time: Union[pd.Timestamp, str], end_time: Union[pd.Timestamp, str], freq: str, future: bool = False
@@ -738,7 +739,7 @@ class LocalFeatureProvider(FeatureProvider, ProviderBackendMixin):
         # validate
         field = str(field)[1:]
         instrument = code_to_fname(instrument)
-        return self.backend_obj(instrument=instrument, field=field, freq=freq)[start_index : end_index + 1]
+        return self.backend_obj(instrument=instrument, field=field, freq=freq)[start_index: end_index + 1]
 
 
 class LocalPITProvider(PITProvider):
@@ -807,7 +808,7 @@ class LocalPITProvider(PITProvider):
             else:
                 period_list = [period]
         else:
-            period_list = period_list[max(0, len(period_list) + start_index - 1) : len(period_list) + end_index]
+            period_list = period_list[max(0, len(period_list) + start_index - 1): len(period_list) + end_index]
         value = np.full((len(period_list),), np.nan, dtype=VALUE_DTYPE)
         for i, p in enumerate(period_list):
             # last_period_index = self.period_index[field].get(period)  # For acceleration
@@ -1258,8 +1259,6 @@ class ClientProvider(BaseProvider):
         else:
             DatasetD.set_conn(self.client)
 
-
-import sys
 
 if sys.version_info >= (3, 9):
     from typing import Annotated

@@ -25,7 +25,7 @@ import os
 import data_formatters.qlib_Alpha158
 
 
-class ExperimentConfig:
+class ExperimentConfig(object):
     """Defines experiment configs and paths to outputs.
 
     Attributes:
@@ -50,18 +50,18 @@ class ExperimentConfig:
         """
 
         if experiment not in self.default_experiments:
-            raise ValueError("Unrecognised experiment={}".format(experiment))
+            raise ValueError('Unrecognised experiment={}'.format(experiment))
 
         # Defines all relevant paths
         if root_folder is None:
-            root_folder = os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "outputs")
-            print("Using root folder {}".format(root_folder))
+            root_folder = os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', 'outputs')
+            print('Using root folder {}'.format(root_folder))
 
         self.root_folder = root_folder
         self.experiment = experiment
-        self.data_folder = os.path.join(root_folder, "data", experiment)
-        self.model_folder = os.path.join(root_folder, "saved_models", experiment)
-        self.results_folder = os.path.join(root_folder, "results", experiment)
+        self.data_folder = os.path.join(root_folder, 'data', experiment)
+        self.model_folder = os.path.join(root_folder, 'saved_models', experiment)
+        self.results_folder = os.path.join(root_folder, 'results', experiment)
 
         # Creates folders if they don't exist
         for relevant_directory in [self.root_folder, self.data_folder, self.model_folder, self.results_folder]:
@@ -78,7 +78,8 @@ class ExperimentConfig:
 
     @property
     def hyperparam_iterations(self):
-        return 240 if self.experiment == "volatility" else 60
+
+        return 240 if self.experiment == 'volatility' else 60
 
     def make_data_formatter(self):
         """Gets a data formatter object for experiment.
