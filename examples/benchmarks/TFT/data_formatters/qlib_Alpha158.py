@@ -124,8 +124,7 @@ class Alpha158Formatter(GenericDataFormatter):
         data = df[real_inputs].values
         self._real_scalers = sklearn.preprocessing.StandardScaler().fit(data)
         self._target_scaler = sklearn.preprocessing.StandardScaler().fit(
-            df[[target_column]].values
-        )  # used for predictions
+            df[[target_column]].values)  # used for predictions
 
         # Format categorical scalers
         categorical_inputs = utils.extract_cols_from_data_type(

@@ -156,6 +156,35 @@ def get_default_tensorflow_config(tf_device='gpu', gpu_id=0):
     return tf_config
 
 
+def set_tf_device(tf_device='gpu', gpu_id=0):
+    """Configure TensorFlow 2 to use CPU or a specific GPU with growth enabled."""
+
+    if tf_device == 'cpu':
+        # 关闭所有 GPU
+        tf.config.set_visible_devices([], 'GPU')
+        print("Using CPU only.")
+    else:
+        # 选择第 gpu_id 张 GPU
+        print("TF version:", tf.__version__)
+        print("Built with CUDA:", tf.test.is_built_with_cuda())
+        print("GPU available:", tf.config.list_physical_devices('GPU'))
+        gpus = tf.config.list_physical_devices('GPU')
+        if gpus:
+            try:
+                # 只让 TensorFlow 看见特定 GPU
+                tf.config.set_visible_devices(gpus[gpu_id], 'GPU')
+
+                # 设置显存自适应增长
+                tf.config.experimental.set_memory_growth(gpus[gpu_id], True)
+
+                print(f"Using GPU ID = {gpu_id}")
+
+            except RuntimeError as e:
+                print(e)
+        else:
+            print("No GPU detected, using CPU.")
+
+
 def save(tf_session, model_folder, cp_name, scope=None):
     """Saves Tensorflow graph to checkpoint.
 
@@ -177,6 +206,7 @@ def save(tf_session, model_folder, cp_name, scope=None):
     save_path = saver.save(tf_session,
                            os.path.join(model_folder, '{0}.ckpt'.format(cp_name)))
     print('Model saved to: {0}'.format(save_path))
+
 
 def load(tf_session, model_folder, cp_name, scope=None, verbose=False):
     """Loads Tensorflow graph from checkpoint.

@@ -113,10 +113,10 @@ def process_qlib_data(df, dataset, fillna=False):
     temp_df = temp_df.reset_index(level=0)
     dates = pd.to_datetime(temp_df.index)
     temp_df["date"] = dates
-    temp_df["day_of_week"] = dates.dayofweek - 1
-    temp_df["month"] = dates.month - 1
+    temp_df["day_of_week"] = dates.dayofweek
+    temp_df["month"] = dates.month
     temp_df["year"] = dates.year
-    temp_df["const"] = 0
+    temp_df["const"] = 1.0
     return temp_df
 
 
@@ -156,7 +156,7 @@ class TFTModel(ModelFT):
 
     def __init__(self, **kwargs):
         self.model = None
-        self.params = {"DATASET": "Alpha158", "label_shift": -5}
+        self.params = {"DATASET": "Alpha158", "label_shift": 5}
         self.params.update(kwargs)
 
     def _prepare_data(self, dataset: DatasetH):
@@ -173,13 +173,8 @@ class TFTModel(ModelFT):
         if DATASET not in ALLOW_DATASET:
             raise AssertionError("The dataset is not supported, please make a new formatter to fit this dataset")
 
-
-        pd.set_option('display.min_rows', 20)  # 最多显示50行
         dtrain, dvalid = self._prepare_data(dataset)
-        print(dtrain)
-        print("=====================================")
         dtrain.loc[:, LABEL_COL] = get_shifted_label(dtrain, shifts=LABEL_SHIFT, col_shift=LABEL_COL)
-        print(dtrain)
         dvalid.loc[:, LABEL_COL] = get_shifted_label(dvalid, shifts=LABEL_SHIFT, col_shift=LABEL_COL)
 
         train = process_qlib_data(dtrain, DATASET, fillna=True).dropna()
@@ -203,10 +198,12 @@ class TFTModel(ModelFT):
                 + "AbstractDataFormatter! Type={}".format(type(self.data_formatter))
             )
 
+        default_keras_session = tf.keras.backend.get_session()
+
         if use_gpu[0]:
-            utils.set_tf_device(tf_device="gpu")
+            self.tf_config = utils.get_default_tensorflow_config(tf_device="gpu", gpu_id=use_gpu[1])
         else:
-            utils.set_tf_device(tf_device="cpu")
+            self.tf_config = utils.get_default_tensorflow_config(tf_device="cpu")
 
         self.data_formatter.set_scalers(train)
 
@@ -221,24 +218,34 @@ class TFTModel(ModelFT):
         params["model_folder"] = self.model_folder
 
         print("*** Begin training ***")
-        self.model = ModelClass(params, use_cudnn=use_gpu[0])
-        self.model.fit(train_df=train, valid_df=valid)
-        saved_model_dir = self.model_folder + "/" + "saved_model"
-        if not os.path.exists(saved_model_dir):
-            os.makedirs(saved_model_dir)
-        self.model.save(saved_model_dir)
+        best_loss = np.Inf
 
-        def extract_numerical_data(data):
-            """Strips out forecast time and identifier columns."""
-            return data[[col for col in data.columns if col not in {"forecast_time", "identifier"}]]
+        tf.reset_default_graph()
 
-        # p50_loss = utils.numpy_normalised_quantile_loss(
-        #    extract_numerical_data(targets), extract_numerical_data(p50_forecast),
-        #    0.5)
-        # p90_loss = utils.numpy_normalised_quantile_loss(
-        #    extract_numerical_data(targets), extract_numerical_data(p90_forecast),
-        #    0.9)
-        # tf.keras.backend.set_session(default_keras_session)
+        self.tf_graph = tf.Graph()
+        with self.tf_graph.as_default():
+            self.sess = tf.Session(config=self.tf_config)
+            tf.keras.backend.set_session(self.sess)
+            self.model = ModelClass(params, use_cudnn=use_gpu[0])
+            self.sess.run(tf.global_variables_initializer())
+            self.model.fit(train_df=train, valid_df=valid)
+            print("*** Finished training ***")
+            saved_model_dir = self.model_folder + "/" + "saved_model"
+            if not os.path.exists(saved_model_dir):
+                os.makedirs(saved_model_dir)
+            self.model.save(saved_model_dir)
+
+            def extract_numerical_data(data):
+                """Strips out forecast time and identifier columns."""
+                return data[[col for col in data.columns if col not in {"forecast_time", "identifier"}]]
+
+            # p50_loss = utils.numpy_normalised_quantile_loss(
+            #    extract_numerical_data(targets), extract_numerical_data(p50_forecast),
+            #    0.5)
+            # p90_loss = utils.numpy_normalised_quantile_loss(
+            #    extract_numerical_data(targets), extract_numerical_data(p90_forecast),
+            #    0.9)
+            tf.keras.backend.set_session(default_keras_session)
         print("Training completed at {}.".format(dte.datetime.now()))
         # ===========================Training Process===========================
 
@@ -250,9 +257,9 @@ class TFTModel(ModelFT):
         d_test.loc[:, self.label_col] = get_shifted_label(d_test, shifts=self.label_shift, col_shift=self.label_col)
         test = process_qlib_data(d_test, self.expt_name, fillna=True).dropna()
 
-        # use_gpu = (True, self.gpu_id)
-        # # ===========================Predicting Process===========================
-        # default_keras_session = tf.keras.backend.get_session()
+        use_gpu = (True, self.gpu_id)
+        # ===========================Predicting Process===========================
+        default_keras_session = tf.keras.backend.get_session()
 
         # Sets up default params
         fixed_params = self.data_formatter.get_experiment_params()
@@ -260,22 +267,15 @@ class TFTModel(ModelFT):
         params = {**params, **fixed_params}
 
         print("*** Begin predicting ***")
+        tf.reset_default_graph()
 
-        output_map = self.model.predict(test, return_targets=True)
-
-        targets = self.data_formatter.format_predictions(output_map["targets"])
-        p50_forecast = self.data_formatter.format_predictions(output_map["p50"])
-        p90_forecast = self.data_formatter.format_predictions(output_map["p90"])
-
-        # tf.reset_default_graph()
-
-        # with self.tf_graph.as_default():
-        #     tf.keras.backend.set_session(self.sess)
-        #     output_map = self.model.predict(test, return_targets=True)
-        #     targets = self.data_formatter.format_predictions(output_map["targets"])
-        #     p50_forecast = self.data_formatter.format_predictions(output_map["p50"])
-        #     p90_forecast = self.data_formatter.format_predictions(output_map["p90"])
-        #     tf.keras.backend.set_session(default_keras_session)
+        with self.tf_graph.as_default():
+            tf.keras.backend.set_session(self.sess)
+            output_map = self.model.predict(test, return_targets=True)
+            targets = self.data_formatter.format_predictions(output_map["targets"])
+            p50_forecast = self.data_formatter.format_predictions(output_map["p50"])
+            p90_forecast = self.data_formatter.format_predictions(output_map["p90"])
+            tf.keras.backend.set_session(default_keras_session)
 
         predict50 = format_score(p50_forecast, "pred", 1)
         predict90 = format_score(p90_forecast, "pred", 1)
@@ -312,7 +312,7 @@ class TFTModel(ModelFT):
         # self.model.save(path)
 
         # save qlib model wrapper
-        drop_attrs = ["model", "data_formatter"]
+        drop_attrs = ["model", "tf_graph", "sess", "data_formatter"]
         orig_attr = {}
         for attr in drop_attrs:
             orig_attr[attr] = getattr(self, attr)
