@@ -24,31 +24,25 @@ if __name__ == "__main__":
 
     R.set_uri("./mlruns_tft")
 
-    market = "csi100"
+    # market = "csi300s19_22"
+    # benchmark = "SH000300"
+
+    market = "sh600000"
     benchmark = "SH000300"
 
     ###################################
     # train model
     ###################################
-    # data_handler_config = {
-    #     "start_time": "2008-01-01",
-    #     "end_time": "2020-08-01",
-    #     "fit_start_time": "2008-01-01",
-    #     "fit_end_time": "2014-12-31",
-    #     "instruments": market,
-    #     "freq": "day",
-    #     "learn_processors": [{
-    #         "class": "DropnaLabel"
-    #     }]
-    # }
-
     data_handler_config = {
         "start_time": "2008-01-01",
         "end_time": "2020-08-01",
         "fit_start_time": "2008-01-01",
         "fit_end_time": "2014-12-31",
         "instruments": market,
-        "freq": "day"
+        "freq": "day",
+        "learn_processors": [{
+            "class": "DropnaLabel"
+        }]
     }
 
     task = {
@@ -75,13 +69,60 @@ if __name__ == "__main__":
     }
 
     # model initialization
-    dataset = init_instance_by_config(task["dataset"])
-    model = init_instance_by_config(task["model"])
+    rid = "de6e525db12a48bb9db5ff71b1614bc6"
+    recorder = R.get_recorder(recorder_id=rid, experiment_name="train_model")
+    model = recorder.load_object("trained_model")
+    model.load()
 
-    # start exp to train model
-    with R.start(experiment_name="train_model"):
-        R.log_params(**flatten_dict(task))
-        model.fit(dataset)
-        R.save_objects(trained_model=model)
-        rid = R.get_recorder().id
-        print("workflow_by_code_TFT_train recorder_id: " + rid)
+    dataset = init_instance_by_config(task["dataset"])
+
+    with R.start(experiment_name="backtest_analysis"):
+        port_analysis_config = {
+            "executor": {
+                "class": "SimulatorExecutor",
+                "module_path": "qlib.backtest.executor",
+                "kwargs": {
+                    "time_per_step": "day",
+                    "generate_portfolio_metrics": True,
+                },
+            },
+            "strategy": {
+                "class": "TopkDropoutStrategy",
+                "module_path": "qlib.contrib.strategy.signal_strategy",
+                "kwargs": {
+                    "model": model,
+                    "dataset": dataset,
+                    "topk": 50,
+                    "n_drop": 5,
+                },
+            },
+            "backtest": {
+                "start_time": "2017-01-01",
+                "end_time": "2020-08-01",
+                "account": 100000000,
+                "benchmark": benchmark,
+                "exchange_kwargs": {
+                    "freq": "day",
+                    "limit_threshold": 0.095,
+                    "deal_price": "close",
+                    "open_cost": 0.0005,
+                    "close_cost": 0.0015,
+                    "min_cost": 5,
+                },
+            },
+        }
+
+        # prediction
+        recorder = R.get_recorder()
+        ba_rid = recorder.id
+        sr = SignalRecord(model, dataset, recorder)
+        sr.generate()
+
+        sar = SigAnaRecord(recorder)
+        sar.generate()
+
+        # backtest & analysis
+        par = PortAnaRecord(recorder, port_analysis_config, "day")
+        par.generate()
+
+        print("workflow_by_code_TFT_backtest recorder_id: " + recorder.id)

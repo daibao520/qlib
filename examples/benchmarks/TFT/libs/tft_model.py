@@ -717,8 +717,7 @@ class TemporalFusionTransformer(object):
         ]
 
         data_map = {}
-        for _, sliced in data.groupby(id_col):
-
+        for id, sliced in data.groupby(id_col):
             col_mappings = {
                 'identifier': [id_col],
                 'time': [time_col],
@@ -734,6 +733,8 @@ class TemporalFusionTransformer(object):
                     data_map[k] = [arr]
                 else:
                     data_map[k].append(arr)
+                if arr is None:
+                    print('Warning: entity id {} has insufficient data!'.format(id))
 
         # Combine all data
         for k in data_map:
@@ -1009,7 +1010,7 @@ class TemporalFusionTransformer(object):
 
         model = tf.keras.Model(inputs=all_inputs, outputs=outputs)
 
-        print(model.summary())
+        # print(model.summary())
 
         valid_quantiles = self.quantiles
         output_size = self.output_size
@@ -1175,8 +1176,8 @@ class TemporalFusionTransformer(object):
 
         combined = self.model.predict(
             inputs,
-            workers=16,
-            use_multiprocessing=True,
+            # workers=16,
+            # use_multiprocessing=True,
             batch_size=self.minibatch_size)
 
         # Format output_csv

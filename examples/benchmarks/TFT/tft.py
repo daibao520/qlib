@@ -113,8 +113,8 @@ def process_qlib_data(df, dataset, fillna=False):
     temp_df = temp_df.reset_index(level=0)
     dates = pd.to_datetime(temp_df.index)
     temp_df["date"] = dates
-    temp_df["day_of_week"] = dates.dayofweek - 1
-    temp_df["month"] = dates.month - 1
+    temp_df["day_of_week"] = dates.dayofweek
+    temp_df["month"] = dates.month
     temp_df["year"] = dates.year
     temp_df["const"] = 0
     return temp_df
@@ -125,7 +125,7 @@ def process_predicted(df, col_name):
 
     Args:
       df: Original DataFrame.
-      fillna: New column name.
+      col_name: New column name.
 
     Returns:
       Transformed DataFrame.
@@ -156,7 +156,7 @@ class TFTModel(ModelFT):
 
     def __init__(self, **kwargs):
         self.model = None
-        self.params = {"DATASET": "Alpha158", "label_shift": -5}
+        self.params = {"DATASET": "Alpha158", "label_shift": 5}
         self.params.update(kwargs)
 
     def _prepare_data(self, dataset: DatasetH):
@@ -173,18 +173,14 @@ class TFTModel(ModelFT):
         if DATASET not in ALLOW_DATASET:
             raise AssertionError("The dataset is not supported, please make a new formatter to fit this dataset")
 
-
-        pd.set_option('display.min_rows', 20)  # 最多显示50行
         dtrain, dvalid = self._prepare_data(dataset)
-        print(dtrain)
-        print("=====================================")
         dtrain.loc[:, LABEL_COL] = get_shifted_label(dtrain, shifts=LABEL_SHIFT, col_shift=LABEL_COL)
-        print(dtrain)
         dvalid.loc[:, LABEL_COL] = get_shifted_label(dvalid, shifts=LABEL_SHIFT, col_shift=LABEL_COL)
 
         train = process_qlib_data(dtrain, DATASET, fillna=True).dropna()
         valid = process_qlib_data(dvalid, DATASET, fillna=True).dropna()
 
+        # pd.set_option('display.min_rows', 300)  # 最多显示50行
         ExperimentConfig = expt_settings.configs.ExperimentConfig
         config = ExperimentConfig(DATASET)
         self.data_formatter = config.make_data_formatter()
@@ -210,6 +206,11 @@ class TFTModel(ModelFT):
 
         self.data_formatter.set_scalers(train)
 
+        # print(train.head(20))
+        train = self.data_formatter.transform_inputs(train)
+        # print(train.head(20))
+        valid = self.data_formatter.transform_inputs(valid)
+
         # Sets up default params
         fixed_params = self.data_formatter.get_experiment_params()
         params = self.data_formatter.get_default_model_params()
@@ -219,6 +220,21 @@ class TFTModel(ModelFT):
         if not os.path.exists(self.model_folder):
             os.makedirs(self.model_folder)
         params["model_folder"] = self.model_folder
+
+        # 过滤小于time_steps的数据实体
+        time_steps = int(params['total_time_steps'])
+        counts = train["instrument"].value_counts()
+        valid_inst = counts[counts >= time_steps].index
+        train = train[train["instrument"].isin(valid_inst)]
+
+        counts = valid["instrument"].value_counts()
+        valid_inst = counts[counts >= time_steps].index
+        valid = valid[valid["instrument"].isin(valid_inst)]
+
+        # for id, sliced in train.groupby("instrument"):
+        #     print(f"22222xxxxxxx {id} {len(sliced)}")
+        #     if (len(sliced) < time_steps):
+        #         print(f"entity id {id} has insufficient data!")
 
         print("*** Begin training ***")
         self.model = ModelClass(params, use_cudnn=use_gpu[0])
@@ -249,10 +265,9 @@ class TFTModel(ModelFT):
         d_test = transform_df(d_test)
         d_test.loc[:, self.label_col] = get_shifted_label(d_test, shifts=self.label_shift, col_shift=self.label_col)
         test = process_qlib_data(d_test, self.expt_name, fillna=True).dropna()
+        test = self.data_formatter.transform_inputs(test)
 
-        # use_gpu = (True, self.gpu_id)
         # # ===========================Predicting Process===========================
-        # default_keras_session = tf.keras.backend.get_session()
 
         # Sets up default params
         fixed_params = self.data_formatter.get_experiment_params()
@@ -263,9 +278,13 @@ class TFTModel(ModelFT):
 
         output_map = self.model.predict(test, return_targets=True)
 
-        targets = self.data_formatter.format_predictions(output_map["targets"])
-        p50_forecast = self.data_formatter.format_predictions(output_map["p50"])
-        p90_forecast = self.data_formatter.format_predictions(output_map["p90"])
+        # targets = self.data_formatter.format_predictions(output_map["targets"])
+        # p50_forecast = self.data_formatter.format_predictions(output_map["p50"])
+        # p90_forecast = self.data_formatter.format_predictions(output_map["p90"])
+
+        targets = output_map["targets"]
+        p50_forecast = output_map["p50"]
+        p90_forecast = output_map["p90"]
 
         # tf.reset_default_graph()
 
@@ -280,6 +299,9 @@ class TFTModel(ModelFT):
         predict50 = format_score(p50_forecast, "pred", 1)
         predict90 = format_score(p90_forecast, "pred", 1)
         predict = (predict50 + predict90) / 2  # self.label_shift
+
+        print("22222222222222222")
+        print(predict)
         # ===========================Predicting Process===========================
         return predict
 
@@ -292,6 +314,35 @@ class TFTModel(ModelFT):
             dataset for finetuning
         """
         pass
+
+    def load(self):
+        self.data_formatter.show_params()
+
+        use_gpu = (True, self.gpu_id)
+        # ===========================Training Process===========================
+        ModelClass = libs.tft_model.TemporalFusionTransformer
+        if not isinstance(self.data_formatter, data_formatters.base.GenericDataFormatter):
+            raise ValueError(
+                "Data formatters should inherit from"
+                + "AbstractDataFormatter! Type={}".format(type(self.data_formatter))
+            )
+
+        if use_gpu[0]:
+            utils.set_tf_device(tf_device="gpu")
+        else:
+            utils.set_tf_device(tf_device="cpu")
+
+        # Sets up default params
+        fixed_params = self.data_formatter.get_experiment_params()
+        params = self.data_formatter.get_default_model_params()
+
+        params = {**params, **fixed_params}
+        params["model_folder"] = self.model_folder
+
+        self.model = ModelClass(params, use_cudnn=use_gpu[0])
+
+        saved_model_dir = self.model_folder + "/" + "saved_model"
+        self.model.load(saved_model_dir, True)
 
     def to_pickle(self, path: Union[Path, str]):
         """
@@ -312,7 +363,7 @@ class TFTModel(ModelFT):
         # self.model.save(path)
 
         # save qlib model wrapper
-        drop_attrs = ["model", "data_formatter"]
+        drop_attrs = ["model"]
         orig_attr = {}
         for attr in drop_attrs:
             orig_attr[attr] = getattr(self, attr)

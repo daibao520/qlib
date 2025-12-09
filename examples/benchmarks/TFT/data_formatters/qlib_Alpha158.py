@@ -126,6 +126,18 @@ class Alpha158Formatter(GenericDataFormatter):
         self._target_scaler = sklearn.preprocessing.StandardScaler().fit(
             df[[target_column]].values)  # used for predictions
 
+        print("--------------------_real_scalers--------------------")
+        print(self._real_scalers.get_params())
+        print("Mean:", self._real_scalers.mean_)
+        print("Scale:", self._real_scalers.scale_)
+        print("Variance:", self._real_scalers.var_)
+
+        print("--------------------_target_scaler--------------------")
+        print(self._target_scaler.get_params())
+        print("Mean:", self._target_scaler.mean_)
+        print("Scale:", self._target_scaler.scale_)
+        print("Variance:", self._target_scaler.var_)
+
         # Format categorical scalers
         categorical_inputs = utils.extract_cols_from_data_type(
             DataTypes.CATEGORICAL, column_definitions, {InputTypes.ID, InputTypes.TIME}
@@ -138,10 +150,19 @@ class Alpha158Formatter(GenericDataFormatter):
             srs = df[col].apply(str)
             categorical_scalers[col] = sklearn.preprocessing.LabelEncoder().fit(srs.values)
             num_classes.append(srs.nunique())
+        print("--------------------_cat_scalers--------------------")
+        for k, v in categorical_scalers.items():
+            print(f"Column: {k}, Classes: {v.classes_}")
 
         # Set categorical scaler outputs
         self._cat_scalers = categorical_scalers
         self._num_classes_per_cat_input = num_classes
+
+        print("--------------------identifiers--------------------")
+        print(self.identifiers)
+
+        print("--------------------_num_classes_per_cat_input--------------------")
+        print(self._num_classes_per_cat_input)
 
     def transform_inputs(self, df):
         """Performs feature transformations.
@@ -162,15 +183,15 @@ class Alpha158Formatter(GenericDataFormatter):
 
         column_definitions = self.get_column_definition()
 
-        real_inputs = utils.extract_cols_from_data_type(
-            DataTypes.REAL_VALUED, column_definitions, {InputTypes.ID, InputTypes.TIME}
-        )
+        # real_inputs = utils.extract_cols_from_data_type(
+        #     DataTypes.REAL_VALUED, column_definitions, {InputTypes.ID, InputTypes.TIME}
+        # )
         categorical_inputs = utils.extract_cols_from_data_type(
             DataTypes.CATEGORICAL, column_definitions, {InputTypes.ID, InputTypes.TIME}
         )
 
         # Format real inputs
-        output[real_inputs] = self._real_scalers.transform(df[real_inputs].values)
+        # output[real_inputs] = self._real_scalers.transform(df[real_inputs].values)
 
         # Format categorical inputs
         for col in categorical_inputs:
@@ -227,3 +248,26 @@ class Alpha158Formatter(GenericDataFormatter):
         }
 
         return model_params
+
+    def show_params(self):
+        print("--------------------_real_scalers--------------------")
+        print(self._real_scalers.get_params())
+        print("Mean:", self._real_scalers.mean_)
+        print("Scale:", self._real_scalers.scale_)
+        print("Variance:", self._real_scalers.var_)
+
+        print("--------------------_target_scaler--------------------")
+        print(self._target_scaler.get_params())
+        print("Mean:", self._target_scaler.mean_)
+        print("Scale:", self._target_scaler.scale_)
+        print("Variance:", self._target_scaler.var_)
+
+        print("--------------------_cat_scalers--------------------")
+        for k, v in self._cat_scalers.items():
+            print(f"Column: {k}, Classes: {v.classes_}")
+
+        print("--------------------identifiers--------------------")
+        print(self.identifiers)
+
+        print("--------------------_num_classes_per_cat_input--------------------")
+        print(self._num_classes_per_cat_input)
