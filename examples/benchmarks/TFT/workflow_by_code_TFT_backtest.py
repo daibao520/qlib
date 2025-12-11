@@ -22,13 +22,13 @@ if __name__ == "__main__":
     GetData().qlib_data(target_dir=provider_uri, region=REG_CN, exists_skip=True)
     qlib.init(provider_uri=provider_uri, region=REG_CN)
 
-    R.set_uri("./mlruns_tft")
-
+    mlruns_path = "mlruns_tft_sh600000"
+    market = "sh600000"
+    benchmark = "SH000300"
     # market = "csi300s19_22"
     # benchmark = "SH000300"
 
-    market = "sh600000"
-    benchmark = "SH000300"
+    R.set_uri("./" + mlruns_path)
 
     ###################################
     # train model
@@ -69,10 +69,10 @@ if __name__ == "__main__":
     }
 
     # model initialization
-    rid = "de6e525db12a48bb9db5ff71b1614bc6"
+    rid = 'ddf17b1bda96457abf730e7de1fec916'
     recorder = R.get_recorder(recorder_id=rid, experiment_name="train_model")
     model = recorder.load_object("trained_model")
-    model.load()
+    model.load(recorder.experiment_id, rid)
 
     dataset = init_instance_by_config(task["dataset"])
 

@@ -15,6 +15,7 @@ from qlib.workflow.record_temp import SignalRecord, PortAnaRecord, SigAnaRecord
 from qlib.tests.data import GetData
 from qlib.tests.config import CSI300_BENCH, CSI300_GBDT_TASK
 
+
 if __name__ == "__main__":
     # use default data
     # provider_uri = "./qlib_data/qlib_data_hs300_5min"  # target_dir
@@ -22,14 +23,27 @@ if __name__ == "__main__":
     GetData().qlib_data(target_dir=provider_uri, region=REG_CN, exists_skip=True)
     qlib.init(provider_uri=provider_uri, region=REG_CN)
 
-    R.set_uri("./mlruns_tft")
-
-    market = "csi100"
+    mlruns_path = "mlruns_tft_sh600000"
+    market = "sh600000"
     benchmark = "SH000300"
+
+    R.set_uri("./" + mlruns_path)
 
     ###################################
     # train model
     ###################################
+    data_handler_config = {
+        "start_time": "2008-01-01",
+        "end_time": "2020-08-01",
+        "fit_start_time": "2008-01-01",
+        "fit_end_time": "2014-12-31",
+        "instruments": market,
+        "freq": "day",
+        "learn_processors": [{
+            "class": "DropnaLabel"
+        }]
+    }
+
     # data_handler_config = {
     #     "start_time": "2008-01-01",
     #     "end_time": "2020-08-01",
@@ -37,19 +51,7 @@ if __name__ == "__main__":
     #     "fit_end_time": "2014-12-31",
     #     "instruments": market,
     #     "freq": "day",
-    #     "learn_processors": [{
-    #         "class": "DropnaLabel"
-    #     }]
     # }
-
-    data_handler_config = {
-        "start_time": "2008-01-01",
-        "end_time": "2020-08-01",
-        "fit_start_time": "2008-01-01",
-        "fit_end_time": "2014-12-31",
-        "instruments": market,
-        "freq": "day"
-    }
 
     task = {
         "model": {
@@ -81,7 +83,7 @@ if __name__ == "__main__":
     # start exp to train model
     with R.start(experiment_name="train_model"):
         R.log_params(**flatten_dict(task))
-        model.fit(dataset)
+        model.fit(dataset, mlruns_path)
         R.save_objects(trained_model=model)
         rid = R.get_recorder().id
         print("workflow_by_code_TFT_train recorder_id: " + rid)

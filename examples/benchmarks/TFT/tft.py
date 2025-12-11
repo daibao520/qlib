@@ -18,6 +18,7 @@ import datetime as dte
 from qlib.model.base import ModelFT
 from qlib.data.dataset import DatasetH
 from qlib.data.dataset.handler import DataHandlerLP
+from qlib.workflow import R
 
 
 # To register new datasets, please add them here.
@@ -165,7 +166,45 @@ class TFTModel(ModelFT):
         )
         return transform_df(df_train), transform_df(df_valid)
 
-    def fit(self, dataset: DatasetH, MODEL_FOLDER="qlib_tft_model", USE_GPU_ID=0, **kwargs):
+    def _filter_instruments(self, date: pd.DataFrame):
+        # 过滤小于time_steps的数据实体
+        # time_steps = int(params['total_time_steps'])
+        # for id, sliced in train.groupby("instrument"):
+        #     if (len(sliced) < time_steps):
+        #         print(f"{id},")
+
+        # for id, sliced in valid.groupby("instrument"):
+        #     if (len(sliced) < time_steps):
+        #         print(f"{id},")
+
+        # counts = train["instrument"].value_counts()
+        # valid_inst = counts[counts >= time_steps].index
+        # train = train[train["instrument"].isin(valid_inst)]
+
+        # counts = valid["instrument"].value_counts()
+        # valid_inst = counts[counts >= time_steps].index
+        # valid = valid[valid["instrument"].isin(valid_inst)]
+
+        exclude_ids = ["SH600038", "SH600373", "SH600398", "SH600485", "SH600570", "SH600578", "SH603288", "SZ002153",
+                       "SZ300015", "SZ300017", "SZ300024", "SZ300027", "SZ300058", "SZ300070", "SZ300124", "SZ300133",
+                       "SZ300146", "SZ300251", "SH600297", "SH600482", "SH600754", "SH601127", "SH601155", "SH601611",
+                       "SH601877", "SZ000008", "SZ000555", "SZ000627", "SZ000671", "SZ000718", "SZ000938", "SZ002049",
+                       "SZ002074", "SZ002085", "SZ002131", "SZ002174", "SZ002299", "SZ002426", "SZ002466", "SZ002714",
+                       "SZ002797", "SZ300033", "SZ300072", "SZ300182"]
+
+        return date[~date["instrument"].isin(exclude_ids)]
+
+    def _make_model_path(self, experiment_id: str = None, recorder_id: str = None):
+        cwd = os.getcwd()
+        exp_info = R.get_exp().info
+        if experiment_id is None:
+            experiment_id = exp_info["id"]
+        if recorder_id is None:
+            recorder_id = exp_info["active_recorder"]
+        model_path = os.path.join(cwd, self.model_folder, "models", str(experiment_id), str(recorder_id))
+        return model_path
+
+    def fit(self, dataset: DatasetH, MODEL_FOLDER="qlib_tft_model", USE_GPU_ID=0, FILTER_INSTRUMENTS=False):
         DATASET = self.params["DATASET"]
         LABEL_SHIFT = self.params["label_shift"]
         LABEL_COL = DATASET_SETTING[DATASET]["label_col"]
@@ -189,6 +228,7 @@ class TFTModel(ModelFT):
         self.label_shift = LABEL_SHIFT
         self.expt_name = DATASET
         self.label_col = LABEL_COL
+        self.filter_instruments = FILTER_INSTRUMENTS
 
         use_gpu = (True, self.gpu_id)
         # ===========================Training Process===========================
@@ -206,9 +246,7 @@ class TFTModel(ModelFT):
 
         self.data_formatter.set_scalers(train)
 
-        # print(train.head(20))
         train = self.data_formatter.transform_inputs(train)
-        # print(train.head(20))
         valid = self.data_formatter.transform_inputs(valid)
 
         # Sets up default params
@@ -217,32 +255,19 @@ class TFTModel(ModelFT):
 
         params = {**params, **fixed_params}
 
-        if not os.path.exists(self.model_folder):
-            os.makedirs(self.model_folder)
-        params["model_folder"] = self.model_folder
+        model_folder = self._make_model_path()
+        if not os.path.exists(model_folder):
+            os.makedirs(model_folder)
+        params["model_folder"] = model_folder
 
-        # 过滤小于time_steps的数据实体
-        time_steps = int(params['total_time_steps'])
-        counts = train["instrument"].value_counts()
-        valid_inst = counts[counts >= time_steps].index
-        train = train[train["instrument"].isin(valid_inst)]
-
-        counts = valid["instrument"].value_counts()
-        valid_inst = counts[counts >= time_steps].index
-        valid = valid[valid["instrument"].isin(valid_inst)]
-
-        # for id, sliced in train.groupby("instrument"):
-        #     print(f"22222xxxxxxx {id} {len(sliced)}")
-        #     if (len(sliced) < time_steps):
-        #         print(f"entity id {id} has insufficient data!")
+        if self.filter_instruments:
+            train = self._filter_instruments(train)
+            valid = self._filter_instruments(valid)
 
         print("*** Begin training ***")
         self.model = ModelClass(params, use_cudnn=use_gpu[0])
         self.model.fit(train_df=train, valid_df=valid)
-        saved_model_dir = self.model_folder + "/" + "saved_model"
-        if not os.path.exists(saved_model_dir):
-            os.makedirs(saved_model_dir)
-        self.model.save(saved_model_dir)
+        self.model.save(model_folder)
 
         def extract_numerical_data(data):
             """Strips out forecast time and identifier columns."""
@@ -267,6 +292,9 @@ class TFTModel(ModelFT):
         test = process_qlib_data(d_test, self.expt_name, fillna=True).dropna()
         test = self.data_formatter.transform_inputs(test)
 
+        if self.filter_instruments:
+            self._filter_instruments(test)
+
         # # ===========================Predicting Process===========================
 
         # Sets up default params
@@ -286,22 +314,10 @@ class TFTModel(ModelFT):
         p50_forecast = output_map["p50"]
         p90_forecast = output_map["p90"]
 
-        # tf.reset_default_graph()
-
-        # with self.tf_graph.as_default():
-        #     tf.keras.backend.set_session(self.sess)
-        #     output_map = self.model.predict(test, return_targets=True)
-        #     targets = self.data_formatter.format_predictions(output_map["targets"])
-        #     p50_forecast = self.data_formatter.format_predictions(output_map["p50"])
-        #     p90_forecast = self.data_formatter.format_predictions(output_map["p90"])
-        #     tf.keras.backend.set_session(default_keras_session)
-
         predict50 = format_score(p50_forecast, "pred", 1)
         predict90 = format_score(p90_forecast, "pred", 1)
         predict = (predict50 + predict90) / 2  # self.label_shift
 
-        print("22222222222222222")
-        print(predict)
         # ===========================Predicting Process===========================
         return predict
 
@@ -315,7 +331,7 @@ class TFTModel(ModelFT):
         """
         pass
 
-    def load(self):
+    def load(self, experiment_id: str = None, recorder_id: str = None):
         self.data_formatter.show_params()
 
         use_gpu = (True, self.gpu_id)
@@ -337,12 +353,11 @@ class TFTModel(ModelFT):
         params = self.data_formatter.get_default_model_params()
 
         params = {**params, **fixed_params}
-        params["model_folder"] = self.model_folder
+        model_path = self._make_model_path(experiment_id, recorder_id)
+        params["model_folder"] = model_path
 
         self.model = ModelClass(params, use_cudnn=use_gpu[0])
-
-        saved_model_dir = self.model_folder + "/" + "saved_model"
-        self.model.load(saved_model_dir, True)
+        self.model.load(model_path, True)
 
     def to_pickle(self, path: Union[Path, str]):
         """
