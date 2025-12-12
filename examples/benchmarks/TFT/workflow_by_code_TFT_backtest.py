@@ -14,6 +14,7 @@ from qlib.workflow import R
 from qlib.workflow.record_temp import SignalRecord, PortAnaRecord, SigAnaRecord
 from qlib.tests.data import GetData
 from qlib.tests.config import CSI300_BENCH, CSI300_GBDT_TASK
+import libs.utils as utils
 
 if __name__ == "__main__":
     # use default data
@@ -69,10 +70,12 @@ if __name__ == "__main__":
     }
 
     # model initialization
-    rid = 'ddf17b1bda96457abf730e7de1fec916'
+    rid = 'adf090be7e5b43318fd628fe2154156c'
     recorder = R.get_recorder(recorder_id=rid, experiment_name="train_model")
     model = recorder.load_object("trained_model")
-    model.load(recorder.experiment_id, rid)
+    local_dir = recorder.get_local_dir()
+    base_dir = utils.get_record_base_dir(local_dir, mlruns_path)
+    model.load(base_dir, recorder.experiment_id, rid)
 
     dataset = init_instance_by_config(task["dataset"])
 

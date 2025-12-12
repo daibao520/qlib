@@ -194,17 +194,16 @@ class TFTModel(ModelFT):
 
         return date[~date["instrument"].isin(exclude_ids)]
 
-    def _make_model_path(self, experiment_id: str = None, recorder_id: str = None):
-        cwd = os.getcwd()
+    def _make_model_path(self, base_dir: str, experiment_id: str = None, recorder_id: str = None):
         exp_info = R.get_exp().info
         if experiment_id is None:
             experiment_id = exp_info["id"]
         if recorder_id is None:
             recorder_id = exp_info["active_recorder"]
-        model_path = os.path.join(cwd, self.model_folder, "models", str(experiment_id), str(recorder_id))
+        model_path = os.path.join(base_dir, self.model_folder, "models", str(experiment_id), str(recorder_id))
         return model_path
 
-    def fit(self, dataset: DatasetH, MODEL_FOLDER="qlib_tft_model", USE_GPU_ID=0, FILTER_INSTRUMENTS=False):
+    def fit(self, dataset: DatasetH, BASE_DIR, MODEL_FOLDER="qlib_tft_model", USE_GPU_ID=0, FILTER_INSTRUMENTS=False):
         DATASET = self.params["DATASET"]
         LABEL_SHIFT = self.params["label_shift"]
         LABEL_COL = DATASET_SETTING[DATASET]["label_col"]
@@ -255,7 +254,7 @@ class TFTModel(ModelFT):
 
         params = {**params, **fixed_params}
 
-        model_folder = self._make_model_path()
+        model_folder = self._make_model_path(BASE_DIR)
         if not os.path.exists(model_folder):
             os.makedirs(model_folder)
         params["model_folder"] = model_folder
@@ -331,7 +330,7 @@ class TFTModel(ModelFT):
         """
         pass
 
-    def load(self, experiment_id: str = None, recorder_id: str = None):
+    def load(self, base_dir: str, experiment_id: str = None, recorder_id: str = None):
         self.data_formatter.show_params()
 
         use_gpu = (True, self.gpu_id)
@@ -353,7 +352,7 @@ class TFTModel(ModelFT):
         params = self.data_formatter.get_default_model_params()
 
         params = {**params, **fixed_params}
-        model_path = self._make_model_path(experiment_id, recorder_id)
+        model_path = self._make_model_path(base_dir, experiment_id, recorder_id)
         params["model_folder"] = model_path
 
         self.model = ModelClass(params, use_cudnn=use_gpu[0])

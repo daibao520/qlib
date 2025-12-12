@@ -14,6 +14,7 @@ from qlib.workflow import R
 from qlib.workflow.record_temp import SignalRecord, PortAnaRecord, SigAnaRecord
 from qlib.tests.data import GetData
 from qlib.tests.config import CSI300_BENCH, CSI300_GBDT_TASK
+import libs.utils as utils
 
 
 if __name__ == "__main__":
@@ -83,7 +84,10 @@ if __name__ == "__main__":
     # start exp to train model
     with R.start(experiment_name="train_model"):
         R.log_params(**flatten_dict(task))
-        model.fit(dataset, mlruns_path)
+        recorder = R.get_recorder()
+        local_dir = recorder.get_local_dir()
+        base_dir = utils.get_record_base_dir(local_dir, mlruns_path)
+        model.fit(dataset, base_dir, mlruns_path)
         R.save_objects(trained_model=model)
-        rid = R.get_recorder().id
-        print("workflow_by_code_TFT_train recorder_id: " + rid)
+
+        print("workflow_by_code_TFT_train recorder_id: " + recorder.id)
