@@ -292,7 +292,7 @@ class TFTModel(ModelFT):
         test = self.data_formatter.transform_inputs(test)
 
         if self.filter_instruments:
-            self._filter_instruments(test)
+            test = self._filter_instruments(test)
 
         # # ===========================Predicting Process===========================
 

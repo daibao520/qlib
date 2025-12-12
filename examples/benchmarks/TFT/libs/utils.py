@@ -263,3 +263,8 @@ def print_weights_in_checkpoint(model_folder, cp_name):
         tensor_name='',
         all_tensors=True,
         all_tensor_names=True)
+
+
+def get_record_base_dir(file_path, run_path):
+    pos = file_path.find(run_path)
+    return file_path[0:pos]
