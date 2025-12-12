@@ -25,9 +25,9 @@ if __name__ == "__main__":
 
     mlruns_path = "mlruns_tft_sh600000"
     market = "sh600000"
+    # mlruns_path = "mlruns_tft_csi300"
+    # market = "csi300"
     benchmark = "SH000300"
-    # market = "csi300s19_22"
-    # benchmark = "SH000300"
 
     R.set_uri("./" + mlruns_path)
 
@@ -45,6 +45,15 @@ if __name__ == "__main__":
             "class": "DropnaLabel"
         }]
     }
+
+    # data_handler_config = {
+    #     "start_time": "2008-01-01",
+    #     "end_time": "2020-08-01",
+    #     "fit_start_time": "2008-01-01",
+    #     "fit_end_time": "2014-12-31",
+    #     "instruments": market,
+    #     "freq": "day",
+    # }
 
     task = {
         "model": {
@@ -70,7 +79,8 @@ if __name__ == "__main__":
     }
 
     # model initialization
-    rid = 'adf090be7e5b43318fd628fe2154156c'
+    rid = 'adf090be7e5b43318fd628fe2154156c'  # sh600000
+    # rid = '52947da177b343bf909b563f13e5360e'  # csi300
     recorder = R.get_recorder(recorder_id=rid, experiment_name="train_model")
     model = recorder.load_object("trained_model")
     local_dir = recorder.get_local_dir()
