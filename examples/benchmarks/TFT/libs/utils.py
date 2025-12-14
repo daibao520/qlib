@@ -268,3 +268,91 @@ def print_weights_in_checkpoint(model_folder, cp_name):
 def get_record_base_dir(file_path, run_path):
     pos = file_path.find(run_path)
     return file_path[0:pos]
+
+
+# PROVIDER_URI = "./qlib_data/cn_data"
+# MLRUNS_PATH = "mlruns_tft_sh600000"
+# MARKET = "sh600000"
+# BENCHMARK = "SH000300"
+
+PROVIDER_URI = "./qlib_data_btc"
+MLRUNS_PATH = "mlruns_tft_btc"
+MARKET = "all"
+BENCHMARK = "SH000300"
+
+# TRAIN_START_TIME = "2008-01-01"
+# TRAIN_END_TIME = "2014-12-31" # 7
+# VALID_START_TIME = "2015-01-01"
+# VALID_END_TIME = "2016-12-31" # 2
+# TEST_START_TIME = "2017-01-01"
+# TEST_END_TIME = "2020-08-01" # 4
+
+# TRAIN_START_TIME = "2005-01-01"
+# TRAIN_END_TIME = "2014-12-31"  # 10
+# VALID_START_TIME = "2015-01-01"
+# VALID_END_TIME = "2016-12-31"  # 2
+# TEST_START_TIME = "2017-01-01"
+# TEST_END_TIME = "2020-08-01"  # 4
+
+TRAIN_START_TIME = "2017-08-17 04:00:00"
+TRAIN_END_TIME = "2021-12-31 23:00:00"  # 5
+VALID_START_TIME = "2022-01-01 00:00:00"
+VALID_END_TIME = "2023-12-31 23:00:00"  # 2
+TEST_START_TIME = "2024-01-01 00:00:00"
+TEST_END_TIME = "2025-11-30 23:00:00"  # 2
+
+# DATA_HANDLER_CONFIG = {
+#     "start_time": TRAIN_START_TIME,
+#     "end_time": TEST_END_TIME,
+#     "fit_start_time": TRAIN_START_TIME,
+#     "fit_end_time": TRAIN_END_TIME,
+#     "instruments": MARKET,
+#     "freq": "day",
+#     "learn_processors": [{
+#             "class": "DropnaLabel"
+#     }]
+# }
+
+# DATA_HANDLER_CONFIG = {
+#     "start_time": TRAIN_START_TIME,
+#     "end_time": TEST_END_TIME,
+#     "fit_start_time": TRAIN_START_TIME,
+#     "fit_end_time": TRAIN_END_TIME,
+#     "instruments": MARKET,
+#     "freq": "day",
+# }
+
+DATA_HANDLER_CONFIG = {
+    "start_time": TRAIN_START_TIME,
+    "end_time": TEST_END_TIME,
+    "fit_start_time": TRAIN_START_TIME,
+    "fit_end_time": TRAIN_END_TIME,
+    "instruments": MARKET,
+    "freq": "60min",
+    "learn_processors": [{
+            "class": "DropnaLabel"
+    }]
+}
+
+TASK_CONFIG = {
+    "model": {
+        "class": "TFTModel",
+        "module_path": "tft",
+    },
+    "dataset": {
+        "class": "DatasetH",
+        "module_path": "qlib.data.dataset",
+        "kwargs": {
+            "handler": {
+                 "class": "Alpha158",
+                 "module_path": "qlib.contrib.data.handler",
+                 "kwargs": DATA_HANDLER_CONFIG,
+            },
+            "segments": {
+                "train": (TRAIN_START_TIME, TRAIN_END_TIME),
+                "valid": (VALID_START_TIME, VALID_END_TIME),
+                "test": (TEST_START_TIME, TEST_END_TIME),
+            }
+        },
+    },
+}

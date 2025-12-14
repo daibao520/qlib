@@ -16,67 +16,13 @@ from qlib.tests.data import GetData
 from qlib.tests.config import CSI300_BENCH, CSI300_GBDT_TASK
 import libs.utils as utils
 
+
 if __name__ == "__main__":
     # use default data
-    # provider_uri = "./qlib_data/qlib_data_hs300_5min"  # target_dir
-    provider_uri = "./qlib_data/cn_data"  # target_dir
-    GetData().qlib_data(target_dir=provider_uri, region=REG_CN, exists_skip=True)
-    qlib.init(provider_uri=provider_uri, region=REG_CN)
+    GetData().qlib_data(target_dir=utils.PROVIDER_URI, region=REG_CN, exists_skip=True)
+    qlib.init(provider_uri=utils.PROVIDER_URI, region=REG_CN)
 
-    mlruns_path = "mlruns_tft_sh600000"
-    market = "sh600000"
-    # mlruns_path = "mlruns_tft_csi300"
-    # market = "csi300"
-    benchmark = "SH000300"
-
-    R.set_uri("./" + mlruns_path)
-
-    ###################################
-    # train model
-    ###################################
-    data_handler_config = {
-        "start_time": "2008-01-01",
-        "end_time": "2020-08-01",
-        "fit_start_time": "2008-01-01",
-        "fit_end_time": "2014-12-31",
-        "instruments": market,
-        "freq": "day",
-        "learn_processors": [{
-            "class": "DropnaLabel"
-        }]
-    }
-
-    # data_handler_config = {
-    #     "start_time": "2008-01-01",
-    #     "end_time": "2020-08-01",
-    #     "fit_start_time": "2008-01-01",
-    #     "fit_end_time": "2014-12-31",
-    #     "instruments": market,
-    #     "freq": "day",
-    # }
-
-    task = {
-        "model": {
-            "class": "TFTModel",
-            "module_path": "tft",
-        },
-        "dataset": {
-            "class": "DatasetH",
-            "module_path": "qlib.data.dataset",
-            "kwargs": {
-                "handler": {
-                    "class": "Alpha158",
-                    "module_path": "qlib.contrib.data.handler",
-                    "kwargs": data_handler_config,
-                },
-                "segments": {
-                    "train": ("2008-01-01", "2014-12-31"),
-                    "valid": ("2015-01-01", "2016-12-31"),
-                    "test": ("2017-01-01", "2020-08-01"),
-                }
-            },
-        },
-    }
+    R.set_uri("./" + utils.MLRUNS_PATH)
 
     # model initialization
     rid = 'adf090be7e5b43318fd628fe2154156c'  # sh600000
@@ -84,10 +30,10 @@ if __name__ == "__main__":
     recorder = R.get_recorder(recorder_id=rid, experiment_name="train_model")
     model = recorder.load_object("trained_model")
     local_dir = recorder.get_local_dir()
-    base_dir = utils.get_record_base_dir(local_dir, mlruns_path)
+    base_dir = utils.get_record_base_dir(local_dir, utils.MLRUNS_PATH)
     model.load(base_dir, recorder.experiment_id, rid)
 
-    dataset = init_instance_by_config(task["dataset"])
+    dataset = init_instance_by_config(utils.TASK_CONFIG["dataset"])
 
     with R.start(experiment_name="backtest_analysis"):
         port_analysis_config = {
@@ -113,7 +59,7 @@ if __name__ == "__main__":
                 "start_time": "2017-01-01",
                 "end_time": "2020-08-01",
                 "account": 100000000,
-                "benchmark": benchmark,
+                "benchmark": utils.BENCHMARK,
                 "exchange_kwargs": {
                     "freq": "day",
                     "limit_threshold": 0.095,
